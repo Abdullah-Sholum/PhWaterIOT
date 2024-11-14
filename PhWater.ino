@@ -8,14 +8,14 @@
 #include <BlynkSimpleEsp32.h>
 
 //inisiasi wifi
-char ssid[] = "wifiPunten";
-char pass[] = "1234567890";
+char ssid[] = "Daviandra";
+char pass[] = "12345678899";
 
 // inisiasi pin GPIO
 #define ledTest 13  
 #define ledWifi 27
 #define ledS1 26
-#define pinPh 25
+#define pinPh 35
 
 //inisiasi variabel buat led
 unsigned long previousMillis = 0;         // Variabel untuk menyimpan waktu sebelumnya
@@ -24,17 +24,6 @@ unsigned long previousMillisTest = 0;     // Variabel untuk menyimpan waktu sebe
 const long intervalTest = 1000;           // Interval berkedip 1 detik untuk LED test
 bool wifiConnected = false;               // Status koneksi WiFi
 BlynkTimer timer;                         // Timer untuk interval pembacaan pH
-
-// Fungsi untuk membaca nilai dari sensor pH
-void readPhWater() {
-  int phValue = analogRead(pinPh);   // Membaca nilai analog dari sensor pH
-  float voltage = phValue * (3.3 / 4095.0);  // Konversi ke tegangan (12-bit)
-  float ph = 3.5 * voltage;          // Konversi tegangan ke nilai pH
-
-  Serial.print("pH air: ");
-  Serial.println(ph);                // Tampilkan nilai pH di Serial Monitor
-  Blynk.virtualWrite(V0, ph);        // Kirim nilai pH ke Blynk di Virtual Pin V0
-}
 
 void setup() {
   //mulai serial monitor 
@@ -48,7 +37,7 @@ void setup() {
   Blynk.connect();
   
   // Memanggil fungsi readPhWater setiap 2 detik
-  timer.setInterval(2000L, readPhWater); 
+  timer.setInterval(2000L, readPh); 
 
   analogReadResolution(12); // Mengatur resolusi ADC ESP32 ke 12-bit
   
@@ -122,25 +111,24 @@ BLYNK_WRITE(V1) {
   }
 }
 
-////fungsi pembacaan sensor
-//void readPhWater() {
-//  int totalPhValue = 0;
-//  const int numSamples = 10;
-//
-//  // Membaca nilai rata-rata dari beberapa sampel
-//  for (int i = 0; i < numSamples; i++) {
-//    totalPhValue += analogRead(pinPh);
-//    delay(10);
-//  }
-//  int phValue = totalPhValue / numSamples;
-//
-//  float voltage = phValue * (3.3 / 4095.0);  // Mengonversi ke tegangan (untuk 12-bit)
-//  float ph = 3.5 * voltage;                  // Sesuaikan faktor kalibrasi sensor Anda
-//
-//  Serial.print("Tegangan sensor pH: ");
-//  Serial.print(voltage);
-//  Serial.print(" V, pH air: ");
-//  Serial.println(ph);    // Menampilkan nilai pH di Serial Monitor
-//  
-//  Blynk.virtualWrite(V0, ph); // Mengirim nilai pH ke Blynk di Virtual Pin V0
-//}
+// Fungsi membaca nilai pH dari sensor
+void readPh() {
+  int sensorValue = analogRead(pinPh);
+  float voltage = sensorValue * (3.3 / 4095.0); // Konversi nilai ADC ke tegangan
+
+  Serial.print("Tegangan dari sensor: ");
+  Serial.println(voltage);
+
+  // Konversi tegangan ke nilai pH
+  float phValue = 7.0 + ((1.65 - voltage) / 0.18);
+
+  // Batasi nilai pH dalam rentang 1 hingga 14
+  if (phValue < 1.0) phValue = 1.0;
+  if (phValue > 14.0) phValue = 14.0;
+
+  Serial.print("Nilai pH: ");
+  Serial.println(phValue);
+
+  // Kirim nilai pH ke Virtual Pin V0 di Blynk
+  Blynk.virtualWrite(V0, phValue);
+}

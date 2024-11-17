@@ -8,14 +8,16 @@
 #include <BlynkSimpleEsp32.h>
 
 //inisiasi wifi
-char ssid[] = "Daviandra";
-char pass[] = "12345678899";
+char ssid[] = "wifiPunten";
+char pass[] = "1234567890";
 
 // inisiasi pin GPIO
 #define ledTest 13  
 #define ledWifi 27
 #define ledS1 26
 #define pinPh 35
+#define pinBuzzer 32
+#define pinResetBuz 18
 
 //inisiasi variabel buat led
 unsigned long previousMillis = 0;         // Variabel untuk menyimpan waktu sebelumnya
@@ -46,18 +48,30 @@ void setup() {
   pinMode(ledTest, OUTPUT);
   pinMode(ledS1, OUTPUT);
   pinMode(pinPh, INPUT);
+  pinMode(pinBuzzer, OUTPUT);
+  pinMode(pinResetBuz, INPUT_PULLUP);
   
-  //animasi awal LED
+  //animasi awal OUPUT
+  digitalWrite(pinBuzzer, HIGH);
+  delay(200);
+  digitalWrite(pinBuzzer, LOW);
+  delay(200);
+  digitalWrite(pinBuzzer, HIGH);
+  delay(200);
+  digitalWrite(pinBuzzer, LOW);
+  delay(200);
   digitalWrite(ledTest, HIGH);
-  digitalWrite(ledS1, HIGH);
-  delay(1500);
-  digitalWrite(ledTest, LOW); delay(500);
-  digitalWrite(ledTest, HIGH); delay(200);
-  digitalWrite(ledTest, LOW); delay(200);
-  digitalWrite(ledTest, HIGH); delay(200);
+  delay(200);
   digitalWrite(ledTest, LOW); 
-  digitalWrite(ledS1, LOW);
-  delay(2000);
+  delay(200);
+  digitalWrite(ledWifi, HIGH); 
+  delay(200);
+  digitalWrite(ledWifi, LOW); 
+  delay(200);
+  digitalWrite(ledS1, HIGH); 
+  delay(200);
+  digitalWrite(ledS1, LOW); 
+  delay(200);
 }
 
 void loop() {
@@ -101,17 +115,18 @@ void ledTestBlink() {
 }
 
 //fungsi cek koneksi dengan led
-BLYNK_WRITE(V1) {
-  int switchState = param.asInt(); // Membaca status dari Virtual Pin V0
-  
-  if (switchState == 1) {
-    digitalWrite(ledS1, HIGH); // Nyalakan LED jika tombol di Blynk ditekan
-  } else {
-    digitalWrite(ledS1, LOW);  // Matikan LED jika tombol di Blynk dilepas
-  }
-}
+//BLYNK_WRITE(V1) {
+//  int switchState = param.asInt(); // Membaca status dari Virtual Pin V0
+//  
+//  if (switchState == 1) {
+//    digitalWrite(ledS1, HIGH); // Nyalakan LED jika tombol di Blynk ditekan
+//  } else {
+//    digitalWrite(ledS1, LOW);  // Matikan LED jika tombol di Blynk dilepas
+//  }
+//}
 
 // Fungsi membaca nilai pH dari sensor
+bool buzzerMuted = false; // Flag untuk mematikan buzzer secara permanen setelah di-reset
 void readPh() {
   int sensorValue = analogRead(pinPh);
   float voltage = sensorValue * (3.3 / 4095.0); // Konversi nilai ADC ke tegangan
@@ -131,4 +146,51 @@ void readPh() {
 
   // Kirim nilai pH ke Virtual Pin V0 di Blynk
   Blynk.virtualWrite(V0, phValue);
+
+  // Kontrol LED indikasi berbahaya berdasarkan nilai pH, terpisah dari kontrol buzzer
+  if (phValue < 4.0 || phValue > 10.0) {
+    digitalWrite(ledS1, HIGH); // LED menyala jika pH berbahaya
+  } else {
+    digitalWrite(ledS1, LOW); // LED mati jika pH normal
+  }
+
+  // Kontrol buzzer terpisah dari LED, cek kondisi pH berbahaya dan flag buzzerMuted
+  if ((phValue < 4.0 || phValue > 10.0) && !buzzerMuted) {
+    // Nyalakan buzzer selama 5 detik atau hingga tombol reset ditekan, atau pH kembali normal
+    unsigned long startMillis = millis();
+    bool buzzerActive = true;
+
+    while (millis() - startMillis < 5000 && buzzerActive) {
+      digitalWrite(pinBuzzer, HIGH); // Nyalakan buzzer
+      
+      // Cek apakah tombol reset ditekan
+      if (digitalRead(pinResetBuz) == LOW) {
+        Serial.println("Buzzer dimatikan oleh tombol reset.");
+        digitalWrite(pinBuzzer, LOW); // Matikan buzzer
+        buzzerMuted = true; // Atur flag untuk mematikan buzzer secara permanen
+        buzzerActive = false; // Keluar dari loop
+        break;
+      }
+
+      // Cek apakah pH sudah kembali normal
+      if (phValue >= 4.0 && phValue <= 10.0) {
+        Serial.println("pH kembali normal, buzzer dimatikan.");
+        digitalWrite(pinBuzzer, LOW); // Matikan buzzer
+        buzzerActive = false; // Keluar dari loop
+        break;
+      }
+
+      // Refresh nilai pH untuk mengecek perubahan dalam loop
+      sensorValue = analogRead(pinPh);
+      voltage = sensorValue * (3.3 / 4095.0);
+      phValue = 7.0 + ((1.65 - voltage) / 0.18);
+    }
+
+    // Matikan buzzer setelah 5 detik atau jika kondisi normal/reset terjadi
+    digitalWrite(pinBuzzer, LOW);
+
+  } else {
+    // Jika kondisi pH normal atau buzzer telah di-reset, buzzer tetap mati
+    digitalWrite(pinBuzzer, LOW);
+  }
 }
